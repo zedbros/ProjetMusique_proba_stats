@@ -80,7 +80,7 @@ begin
 
         Plots.scatter3d(x, y, z, group=labels, title = "K-nn, dist= euclidean, datasize= " * string(length(data)) * " k= " * string(k))
         Plots.scatter!([point[1]],[point[2]],[point[3]], label = "ESTIMATION = " * string(estim))
-
+    end
 
    test()
 end
