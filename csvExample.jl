@@ -1,7 +1,3 @@
-import Pkg
-Pkg.add("CSV")
-Pkg.add("DataFrames")
-Pkg.add("StatsPlots")
 using CSV, DataFrames, StatsPlots
 
 begin
