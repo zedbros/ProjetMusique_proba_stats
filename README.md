@@ -1,5 +1,5 @@
 # ProjetMusique_proba_stats
-Projet for probabilities and statistiques at HES-SO Valais-Wallis.
+HES-SO Valais-Wallis projet in probabilities and statistiques course.
 
 # Run
 ### Using Julia VS Code extension (recommended)

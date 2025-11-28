@@ -1,6 +1,3 @@
-import Pkg
-Pkg.add("Plots")
-Pkg.add("StatsBase")
 using Plots, StatsBase
 
 begin
