@@ -2,7 +2,7 @@
 
 julia_version = "1.11.6"
 manifest_format = "2.0"
-project_hash = "e052045987f13ccae7987cd71380dd4b100ef50a"
+project_hash = "52e8a8cd8fb7ffea83986a0ac58628d479e52dec"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -170,6 +170,11 @@ git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
 uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
 version = "4.1.1"
 
+[[deps.DBInterface]]
+git-tree-sha1 = "a444404b3f94deaa43ca2a58e18153a82695282b"
+uuid = "a10d1c49-ce27-4219-8d33-6db1a4562965"
+version = "2.6.1"
+
 [[deps.DataAPI]]
 git-tree-sha1 = "abe83f3a2f1b857aac70ef8b269080af17764bbe"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
@@ -202,6 +207,18 @@ deps = ["Artifacts", "Expat_jll", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "473e9afc9cf30814eb67ffa5f2db7df82c3ad9fd"
 uuid = "ee1fde0b-3d02-5ea6-8484-8dfef6360eab"
 version = "1.16.2+0"
+
+[[deps.DecFP]]
+deps = ["DecFP_jll", "Printf", "Random", "SpecialFunctions"]
+git-tree-sha1 = "88e521a871a1b11488a1f48b8c085b4be8f71be5"
+uuid = "55939f99-70c6-5e9b-8bb0-5071ed7d61fd"
+version = "1.4.1"
+
+[[deps.DecFP_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "40e4404a0a267a8e75f5c1ce2cc9b5e2ce1ba268"
+uuid = "47200ebd-12ce-5be5-abb7-8e082af23329"
+version = "2.0.300+0"
 
 [[deps.DelimitedFiles]]
 deps = ["Mmap"]
@@ -673,6 +690,12 @@ git-tree-sha1 = "1e0228a030642014fe5cfe68c2c0a818f9e3f522"
 uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 version = "0.5.16"
 
+[[deps.MariaDB_Connector_C_jll]]
+deps = ["Artifacts", "JLLWrappers", "LibCURL_jll", "Libdl", "Libiconv_jll", "OpenSSL_jll", "Zlib_jll"]
+git-tree-sha1 = "f28030c6b0d000cb2e661a71a69772c839ae3963"
+uuid = "aabc7e14-95f1-5e66-9f32-aea603782360"
+version = "3.3.9+0"
+
 [[deps.Markdown]]
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
@@ -713,6 +736,12 @@ deps = ["Arpack", "Distributions", "LinearAlgebra", "SparseArrays", "Statistics"
 git-tree-sha1 = "816620e3aac93e5b5359e4fdaf23ca4525b00ddf"
 uuid = "6f286f6a-111f-5878-ab1e-185364afe411"
 version = "0.10.3"
+
+[[deps.MySQL]]
+deps = ["DBInterface", "Dates", "DecFP", "Libdl", "MariaDB_Connector_C_jll", "Parsers", "Tables"]
+git-tree-sha1 = "481675f48fe046054ec7455fc9487d1fe79811f8"
+uuid = "39abe10b-433b-5dbd-92d4-e302a9df00cd"
+version = "1.4.7"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
