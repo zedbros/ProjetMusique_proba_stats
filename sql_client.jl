@@ -29,12 +29,14 @@ LIMIT 10;
 """
 
 
-query = "
+query2 = "
 select title as AAAAAAAAAAAAAAAAAAAAAAAAAA
 from tracks
 limit 10;"
 
-DBInterface.execute(conn, query)
+query3 = "CREATE TABLE Test (Column1 int);"
 
-# Have to write the data into a file just to test that the values selected
+# Have to write the data into a dataFrame just to test that the values selected
 # in the query are correct.
+queryResults = DataFrame(DBInterface.execute(conn, query1))
+print(queryResults)
