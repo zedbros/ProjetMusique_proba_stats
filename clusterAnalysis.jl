@@ -1,11 +1,6 @@
-using MySQL
-using DBInterface
-using DataFrames
+include("sql_client.jl")
 
-function getDbData(query)
-  conn = DBInterface.connect(MySQL.Connection, "crossover.proxy.rlwy.net", "root", "tLeGwnVSAGVQLYbaMcdSJLunevRZRghw", db="railway", port=17837)
-
-  query1 = """
+punkQuery = """
     SELECT 
         t.title AS track_title,
         a.name AS artist_name,
@@ -26,21 +21,9 @@ function getDbData(query)
     WHERE e.acousticness IS NOT NULL 
       AND e.danceability IS NOT NULL
       AND e.energy IS NOT NULL
+      AND g.title = 'Punk'
     LIMIT 10;
     """
 
-
-  query2 = "
-    select title as AAAAAAAAAAAAAAAAAAAAAAAAAA
-    from tracks
-    limit 10;"
-
-  query3 = "CREATE TABLE Test (Column1 int);"
-
-  # Have to write the data into a dataFrame just to test that the values selected
-  # in the query are correct.
-  queryResults = DataFrame(DBInterface.execute(conn, query))
-  #print(queryResults)
-
-  return queryResults
-end
+data = getDbData(punkQuery)
+print(data)
