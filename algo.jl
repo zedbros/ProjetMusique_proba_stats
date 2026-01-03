@@ -9,6 +9,13 @@ begin
         return sqrt(sum)
     end
 
+    function weighted_distance(n1,n2,weights)
+        sum = 0
+        for i in eachindex(n1)
+            sum += weights[i] * (n1[i]-n2[i])^2
+        end
+        return sqrt(sum)
+    end
 
 
     function k_nn(data,labels,point,k)
@@ -25,6 +32,22 @@ begin
 
         return label
     end
+
+    function k_nn(weights,data,labels,point,k)
+        k = min(k,length(labels))
+        distances = []
+        for i in eachindex(data)
+            distance = weighted_distance(data[i],point,weights)
+            push!(distances,[distance,labels[i]])
+        end
+        sort!(distances)
+        k_nearest = distances[1:k]
+        nearest_label = [subarr[2] for subarr in k_nearest]
+        label = mode(nearest_label)
+
+        return label
+    end
+        
 
     function test()
         data = [
@@ -65,11 +88,12 @@ begin
             'B','B','B','B','B','A','A','B','A','A'
         ]
 
+        weights = [1,1,1]
         k = 5
+        point = [3,1.2,0.5]
 
-        point = [1.7,1,1]
 
-        estim = k_nn(data,labels,point,k)
+        estim = k_nn(weights,data,labels,point,k)
 
         x = [d[1] for d in data]
         y = [d[2] for d in data]
