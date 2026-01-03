@@ -67,6 +67,9 @@ begin
         return score
     end
         
+    #data = [datapoint,datapoint,datapoint]
+    #labels = [rock, metal, rock]
+    #datapoint = [chroma, tempo, danceability]
 
     function test()
         data = [
@@ -109,9 +112,13 @@ begin
             'B','B','B','B','B','A','A','B','A','A'
         ]
 
+
         weights = [1,1,1]
         k = 5
         point = [3,1.2,0.5]
+
+        acc = correctness(weights, data, labels, data, labels, k)
+        print(acc)
 
 
         estim = k_nn(weights,data,labels,point,k)
