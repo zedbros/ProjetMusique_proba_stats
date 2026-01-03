@@ -189,19 +189,41 @@ begin
         return vec(result)
     end
 
+    function generate_possibilities(array1, array2, array3, array4, array5)
+        n = length(array1)
+        # For each index, create a vector of the three options
+        options = [ [array1[i], array2[i], array3[i], array4[i], array5[i]] for i in 1:n ]
 
-    function optimize_weights(base_weights, data, labels, testdata, testlabels, k, iterations = 10, diff = 1)
+        # Use Iterators.product to get all combinations
+        result = [vcat(t...) for t in Iterators.product(options...)]
+        
+        return vec(result)
+    end
+
+
+    function optimize_weights(base_weights, data, labels, testdata, testlabels, k, iterations = 20, diff = 1, no_improvements = 0,global_best_weights = nothing, global_best_score = 0)
         #todo : find a way to escape local optima (simulated annealing,random restarts or momentum)
 
         if iterations == 0
-            return base_weights
+            return global_best_weights
         end
-        print(diff)
 
-        weights_mult = base_weights .+ diff
-        weights_div = base_weights .- diff
+        # Initialize global best on first call
+        if global_best_weights === nothing
+            global_best_weights = base_weights
+            global_best_score = correctness(base_weights, data, labels, testdata, testlabels, k)
+            println("Initial score: $global_best_score")
+        end
         
-        candidate_weight_sets = generate_possibilities(weights_div,base_weights,weights_mult)
+        println("Iteration: $(-iterations), diff: $diff")
+
+
+        weights_add2 = base_weights .+ diff
+        weights_add1 = base_weights .+ 0.5 * diff
+        weights_sus1 = max.(base_weights .- 0.5 * diff, 0)
+        weights_sus2 = max.(base_weights .- diff, 0)
+        
+        candidate_weight_sets = generate_possibilities(weights_add2,weights_add1,base_weights,weights_sus1,weights_sus2)
         #println(candidate_weight_sets)
 
         best_weights = base_weights
@@ -214,10 +236,33 @@ begin
                 best_weights = weights
             end
         end
+
+        if best_score > global_best_score
+            global_best_score = best_score
+            global_best_weights = best_weights
+        end
+
         println(best_weights)
         println(best_score)
 
-        return optimize_weights(best_weights, data, labels, testdata, testlabels, k, iterations -1, diff/2)
+
+        if best_weights == base_weights
+            no_improvements += 1
+         else
+            no_improvements = 0  # Reset counter on improvement
+        end
+
+        new_diff = diff/ 1.6
+        new_weights = best_weights
+
+        if no_improvements > 1 && diff < 0.1  #3 times same
+            println("→ Random restart triggered!")
+            new_weights = rand(length(base_weights))
+            new_diff = 1.0
+            no_improvements = 0
+        end
+
+        return optimize_weights(new_weights, data, labels, testdata, testlabels, k, iterations -1, new_diff,no_improvements,global_best_weights, global_best_score)
     end
 
 
@@ -258,6 +303,17 @@ begin
                 push!(test_labels, i)
             end
         end
+
+        k = 10
+        weights1 = [1.125, 1.0, 2.25]
+        weights2 = [1.9408265205339719, 1.7027122494434037, 0.8844966417335357]
+
+        score1 = correctness(weights1, data, labels, test_data, test_labels, k)
+        score2 = correctness(weights2, data, labels, test_data, test_labels, k)
+
+        println("Score with weights1: $score1")
+        println("Score with weights2: $score2")
+        println("Are they equal? $(score1 == score2)")
 
         weights = [3,1,2]
         k = 10
