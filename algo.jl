@@ -189,14 +189,17 @@ begin
         return vec(result)
     end
 
-    function optimize_weights(base_weights, data, labels, testdata, testlabels, k, iterations = 10, multiplier = 5)
+
+    function optimize_weights(base_weights, data, labels, testdata, testlabels, k, iterations = 10, diff = 1)
+        #todo : find a way to escape local optima (simulated annealing,random restarts or momentum)
+
         if iterations == 0
             return base_weights
         end
-        print(multiplier)
+        print(diff)
 
-        weights_mult = base_weights .* multiplier
-        weights_div = base_weights ./ multiplier
+        weights_mult = base_weights .+ diff
+        weights_div = base_weights .- diff
         
         candidate_weight_sets = generate_possibilities(weights_div,base_weights,weights_mult)
         #println(candidate_weight_sets)
@@ -214,7 +217,7 @@ begin
         println(best_weights)
         println(best_score)
 
-        return optimize_weights(best_weights, data, labels, testdata, testlabels, k, iterations -1, (multiplier-1) / 2.0 + 1)
+        return optimize_weights(best_weights, data, labels, testdata, testlabels, k, iterations -1, diff/2)
     end
 
 
@@ -266,7 +269,7 @@ begin
         acc1 = correctness(weights, data, labels, test_data, test_labels, k)
         println("Correctness without weigth: " , acc1)
 
-        optimized_weights = optimize_weights(weights, data, labels, test_data, test_labels, k)
+        optimized_weights = optimize_weights([1,1,1], data, labels, test_data, test_labels, k)
 
         acc2 = correctness(optimized_weights, data, labels, test_data, test_labels, k)
         println("Correctness with weigth: " , acc2)
