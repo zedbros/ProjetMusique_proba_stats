@@ -47,10 +47,31 @@ begin
 
         return label
     end
+
+    function unittest(weights,data,labels,testpoint,testlabel,k)
+        estim = k_nn(weights,data,labels,testpoint,k)
+        if estim == testlabel return true
+        end
+        return false
+    end
+
+    function correctness(weights, data, labels, testdata, testlabels, k)
+        score = 0
+        for (testpoint, testlabel) in zip(testdata, testlabels)
+            if unittest(weights,data,labels,testpoint,testlabel,k)
+                score += 1
+            end
+        end
+
+        score /= length(testdata)
+        return score
+    end
         
 
     function test()
         data = [
+            #Point = [attribute A, attribute B, attribute C]
+
             # Class A
             [1.0, 1.0, 0.5], [1.2, 1.1, 0.6], [1.1, 1.3, 0.4], [1.3, 1.0, 0.7], [1.4, 1.2, 0.5],
             [1.5, 1.3, 0.6], [1.6, 1.4, 0.7], [1.7, 1.2, 0.5], [1.8, 1.3, 0.6], [1.9, 1.1, 0.5],
