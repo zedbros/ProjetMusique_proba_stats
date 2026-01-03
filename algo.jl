@@ -189,15 +189,17 @@ begin
         return vec(result)
     end
 
-    function optimize_weights(base_weights, data, labels, testdata, testlabels, k, iterations = 10, multiplier = 2)
+    function optimize_weights(base_weights, data, labels, testdata, testlabels, k, iterations = 10, multiplier = 5)
         if iterations == 0
             return base_weights
         end
+        print(multiplier)
 
         weights_mult = base_weights .* multiplier
         weights_div = base_weights ./ multiplier
         
         candidate_weight_sets = generate_possibilities(weights_div,base_weights,weights_mult)
+        #println(candidate_weight_sets)
 
         best_weights = base_weights
         best_score = correctness(base_weights, data, labels, testdata, testlabels, k)
@@ -208,13 +210,11 @@ begin
                 best_score = score
                 best_weights = weights
             end
-            println(best_weights)
-            println(best_score)
         end
         println(best_weights)
         println(best_score)
 
-        return optimize_weights(best_weights, data, labels, testdata, testlabels, k, iterations -1, multiplier / 2 + 1)
+        return optimize_weights(best_weights, data, labels, testdata, testlabels, k, iterations -1, (multiplier-1) / 2.0 + 1)
     end
 
 
