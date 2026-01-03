@@ -1,6 +1,92 @@
+include("sql_client.jl")
 using Plots, StatsBase
 
 begin
+    genreList = ["Rock", "Electronic", "Folk"]
+    queryList = []
+
+    rockQuery = """
+        SELECT 
+            t.title AS track_title,
+            a.name AS artist_name,
+            g.title AS genre,
+            e.acousticness,
+            e.danceability,
+            e.energy,
+            e.instrumentalness,
+            e.liveness,
+            e.speechiness,
+            e.tempo,
+            e.valence
+        FROM tracks t
+        INNER JOIN echonest_features e ON t.track_id = e.track_id
+        INNER JOIN artists a ON t.artist_id = a.artist_id
+        INNER JOIN track_genres tg ON t.track_id = tg.track_id
+        INNER JOIN genres g ON tg.genre_id = g.genre_id
+        WHERE e.acousticness IS NOT NULL 
+        AND e.danceability IS NOT NULL
+        AND e.energy IS NOT NULL
+        AND g.title = 'Rock'
+        LIMIT 500;
+        """
+
+        electronicQuery = """
+        SELECT 
+            t.title AS track_title,
+            a.name AS artist_name,
+            g.title AS genre,
+            e.acousticness,
+            e.danceability,
+            e.energy,
+            e.instrumentalness,
+            e.liveness,
+            e.speechiness,
+            e.tempo,
+            e.valence
+        FROM tracks t
+        INNER JOIN echonest_features e ON t.track_id = e.track_id
+        INNER JOIN artists a ON t.artist_id = a.artist_id
+        INNER JOIN track_genres tg ON t.track_id = tg.track_id
+        INNER JOIN genres g ON tg.genre_id = g.genre_id
+        WHERE e.acousticness IS NOT NULL 
+        AND e.danceability IS NOT NULL
+        AND e.energy IS NOT NULL
+        AND g.title = 'Electronic'
+        LIMIT 500;
+        """
+
+        folkQuery = """
+        SELECT 
+            t.title AS track_title,
+            a.name AS artist_name,
+            g.title AS genre,
+            e.acousticness,
+            e.danceability,
+            e.energy,
+            e.instrumentalness,
+            e.liveness,
+            e.speechiness,
+            e.tempo,
+            e.valence
+        FROM tracks t
+        INNER JOIN echonest_features e ON t.track_id = e.track_id
+        INNER JOIN artists a ON t.artist_id = a.artist_id
+        INNER JOIN track_genres tg ON t.track_id = tg.track_id
+        INNER JOIN genres g ON tg.genre_id = g.genre_id
+        WHERE e.acousticness IS NOT NULL 
+        AND e.danceability IS NOT NULL
+        AND e.energy IS NOT NULL
+        AND g.title = 'Folk'
+        LIMIT 500;
+        """
+    push!(queryList, rockQuery)
+    push!(queryList, electronicQuery)
+    push!(queryList, folkQuery)
+
+    dataList = [getDbData(i) for i in queryList]
+
+
+
     function euclidian_distance(n1,n2)
         sum = 0
         for i in eachindex(n1)
@@ -72,7 +158,13 @@ begin
     #datapoint = [chroma, tempo, danceability]
 
     function test()
-        data = [
+        # Have to make a function that populates the data with the correct values from the
+        # database.
+        # So class A for example would be the Rock classe.
+        # The 6 total genres we are going to use in order by highest number of songs:
+        # Rock, Electronic, Folk, Punk, Hip-Hop, Pop.
+
+        data_old = [
             #Point = [attribute A, attribute B, attribute C]
 
             # Class A
@@ -95,7 +187,7 @@ begin
             [2.0, 2.2, 1.2], [2.1, 2.3, 1.3], [2.2, 2.2, 1.1], [2.3, 2.3, 1.2], [2.4, 2.2, 1.1],
             [1.8, 2.1, 0.9], [1.9, 2.2, 1.0], [2.0, 2.1, 1.1], [1.7, 2.0, 0.8], [1.6, 2.1, 0.9]
         ]
-        labels = [
+        labels_old = [
             # Class A
             'A','A','A','A','A','A','A','A','A','A',
 
@@ -113,13 +205,48 @@ begin
         ]
 
 
-        weights = [1,1,1]
-        k = 5
-        point = [3,1.2,0.5]
+        # Let's start with 10 songs from each genre.
+        nbrOfDataPointsPerGenre = 500
+        data = []
+        for genreDF in dataList
+            for i in 1:nbrOfDataPointsPerGenre
+                attribute1 = genreDF.acousticness[i]
+                attribute2 = genreDF.danceability[i]
+                attribute3 = genreDF.energy[i]
+                push!(data, [attribute1, attribute2, attribute3])
+            end
+        end
+
+        labels = []
+        for i in genreList
+            for j in 1:nbrOfDataPointsPerGenre
+                push!(labels, i)
+            end
+        end
+
+        weights = [3,1,2]
+        k = 300
+        # This would be the song's info. So am testing the 11th rock song:
+        # II - Saint Pancrace by ZUHN
+        point = [0.831, 0.115, 0.007]
+
+        # /////////////////////// CURRENT STATUS ///////////////////////
+        # We now have a function that takes the first 500 songs in
+        # the genres Rock, Electronic and Folk.
+        # It then takes each song's acousticness, danceability and energy
+        # values and are represented as one point on the graph.
+        # We then take our points (which is our song of choice's values)
+        # and we use knn to try and tetermine which genre it belongs too.
+
+        # In order to improve this algorithm's accuracy, an idea would
+        # be to choose our 500 songs well, by using those who's values
+        # are closest to that genre's average as an example.
+        # The average isn't the best option so will try something
+        # more concrete.
+        # ////////////////////// /CURRENT STATUS/ //////////////////////
 
         acc = correctness(weights, data, labels, data, labels, k)
         print(acc)
-
 
         estim = k_nn(weights,data,labels,point,k)
 
