@@ -1,6 +1,6 @@
 include("sql_client.jl")
 using Plots, StatsBase
-
+using Random
 begin
     genreList = ["Rock", "Electronic", "Folk", "Pop"]
     queryList = []
@@ -27,7 +27,7 @@ begin
         AND e.danceability IS NOT NULL
         AND e.energy IS NOT NULL
         AND g.title = 'Rock'
-        LIMIT 200;
+        LIMIT 750;
         """
 
     electronicQuery = """
@@ -52,7 +52,7 @@ begin
         AND e.danceability IS NOT NULL
         AND e.energy IS NOT NULL
         AND g.title = 'Electronic'
-        LIMIT 200;
+        LIMIT 750;
         """
     folkQuery = """
         SELECT 
@@ -76,7 +76,7 @@ begin
         AND e.danceability IS NOT NULL
         AND e.energy IS NOT NULL
         AND g.title = 'Folk'
-        LIMIT 200;
+        LIMIT 750;
         """
     popQuery = """
         SELECT 
@@ -100,7 +100,7 @@ begin
         AND e.danceability IS NOT NULL
         AND e.energy IS NOT NULL
         AND g.title = 'Pop'
-        LIMIT 200;
+        LIMIT 750;
         """
 
     
@@ -189,19 +189,23 @@ begin
         return vec(result)
     end
 
-    function generate_possibilities(array1, array2, array3, array4, array5)
-        n = length(array1)
-        # For each index, create a vector of the three options
-        options = [ [array1[i], array2[i], array3[i], array4[i], array5[i]] for i in 1:n ]
-
-        # Use Iterators.product to get all combinations
+    function generate_possibilities(arrays...)
+        n = length(arrays[1])
+        
+        # Verify all arrays have same length
+        @assert all(length(arr) == n for arr in arrays) "All arrays must have the same length"
+        
+        # For each index, collect the options from all arrays
+        options = [[arr[i] for arr in arrays] for i in 1:n]
+        
+        # Generate all combinations
         result = [vcat(t...) for t in Iterators.product(options...)]
         
         return vec(result)
     end
 
 
-    function optimize_weights(base_weights, data, labels, testdata, testlabels, k, iterations = 20, diff = 1, no_improvements = 0,global_best_weights = nothing, global_best_score = 0)
+    function optimize_weights(base_weights, data, labels, testdata, testlabels, k, iterations = 10, diff = 1, no_improvements = 0,global_best_weights = nothing, global_best_score = 0)
         #todo : find a way to escape local optima (simulated annealing,random restarts or momentum)
 
         if iterations == 0
@@ -252,11 +256,11 @@ begin
             no_improvements = 0  # Reset counter on improvement
         end
 
-        new_diff = diff/ 1.6
+        new_diff = diff/ 3
         new_weights = best_weights
 
-        if no_improvements > 1 && diff < 0.1  #3 times same
-            println("→ Random restart triggered!")
+        if no_improvements >= 1 && diff < 0.2  #2 times same
+            println("-> Random restart triggered!")
             new_weights = rand(length(base_weights))
             new_diff = 1.0
             no_improvements = 0
@@ -265,6 +269,49 @@ begin
         return optimize_weights(new_weights, data, labels, testdata, testlabels, k, iterations -1, new_diff,no_improvements,global_best_weights, global_best_score)
     end
 
+    function getDataWithrandomTest(dataList, genreList)
+        data = []
+        test_data = []
+
+        labels = []
+        test_labels = []
+
+        DFsize = nrow(dataList[1])
+        println(DFsize)
+        nbrOfDataPointsPerGenre = DFsize * 95 ÷ 100
+        println(nbrOfDataPointsPerGenre)
+        nbrOfTestsPointsPerGenre = DFsize - nbrOfDataPointsPerGenre
+        println(nbrOfTestsPointsPerGenre)
+
+        
+        for (genreDF, genre_name) in zip(dataList, genreList)
+
+            shuffled_indices = shuffle(1:nrow(genreDF))
+            genreDF = genreDF[shuffled_indices, :]
+
+            for i in 1:nbrOfDataPointsPerGenre
+                attribute1 = genreDF.acousticness[i]
+                attribute2 = genreDF.danceability[i]
+                attribute3 = genreDF.energy[i]
+
+                push!(data, [attribute1, attribute2, attribute3])
+
+                push!(labels, genre_name)
+            end
+            for i in (nbrOfDataPointsPerGenre+1):(nbrOfDataPointsPerGenre + nbrOfTestsPointsPerGenre)
+                attribute1 = genreDF.acousticness[i]
+                attribute2 = genreDF.danceability[i]
+                attribute3 = genreDF.energy[i]
+
+                push!(test_data, [attribute1, attribute2, attribute3])
+
+                push!(test_labels, genre_name)
+            end
+        end
+
+        return data, test_data, labels, test_labels
+
+    end
 
     function test()
         # Have to make a function that populates the data with the correct values from the
@@ -273,50 +320,14 @@ begin
         # The 4 total genres we are going to use in order by highest number of songs:
         # Rock, Electronic, Folk and Pop.
 
-        nbrOfDataPointsPerGenre = 160
-        nbrOfTestsPointsPerGenre = 40
+        #nbrOfDataPointsPerGenre = 900
+        #nbrOfTestsPointsPerGenre = 100
 
-        data = []
-        test_data = []
-        for genreDF in dataList
-            for i in 1:nbrOfDataPointsPerGenre
-                attribute1 = genreDF.acousticness[i]
-                attribute2 = genreDF.danceability[i]
-                attribute3 = genreDF.energy[i]
-                push!(data, [attribute1, attribute2, attribute3])
-            end
-            for i in nbrOfDataPointsPerGenre:(nbrOfDataPointsPerGenre + nbrOfTestsPointsPerGenre)
-                attribute1 = genreDF.acousticness[i]
-                attribute2 = genreDF.danceability[i]
-                attribute3 = genreDF.energy[i]
-                push!(test_data, [attribute1, attribute2, attribute3])
-            end
-        end
+        data, test_data, labels, test_labels = getDataWithrandomTest(dataList, genreList)
 
-        labels = []
-        test_labels = []
-        for i in genreList
-            for j in 1:nbrOfDataPointsPerGenre
-                push!(labels, i)
-            end
-            for j in nbrOfDataPointsPerGenre:(nbrOfDataPointsPerGenre + nbrOfTestsPointsPerGenre)
-                push!(test_labels, i)
-            end
-        end
-
-        k = 10
-        weights1 = [1.125, 1.0, 2.25]
-        weights2 = [1.9408265205339719, 1.7027122494434037, 0.8844966417335357]
-
-        score1 = correctness(weights1, data, labels, test_data, test_labels, k)
-        score2 = correctness(weights2, data, labels, test_data, test_labels, k)
-
-        println("Score with weights1: $score1")
-        println("Score with weights2: $score2")
-        println("Are they equal? $(score1 == score2)")
 
         weights = [3,1,2]
-        k = 10
+        k = 20
         # This would be the song's info. So am testing the 11th rock song:
         # II - Saint Pancrace by ZUHN
         point = [0.831, 0.115, 0.007]
