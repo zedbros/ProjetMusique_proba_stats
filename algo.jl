@@ -205,12 +205,13 @@ begin
     end
 
 
-    function optimize_weights(base_weights, data, labels, testdata, testlabels, k, iterations = 10, diff = 1, no_improvements = 0,global_best_weights = nothing, global_best_score = 0)
+    function optimize_weights(base_weights,dataList,genreList, k, iterations = 5, diff = 1, no_improvements = 0,global_best_weights = nothing, global_best_score = 0)
         #todo : find a way to escape local optima (simulated annealing,random restarts or momentum)
 
         if iterations == 0
-            return global_best_weights
+            return base_weights
         end
+        data, testdata, labels, testlabels = getDataWithrandomTest(dataList, genreList)
 
         # Initialize global best on first call
         if global_best_weights === nothing
@@ -250,13 +251,12 @@ begin
         println(best_score)
 
 
-        if best_weights == base_weights
-            no_improvements += 1
-         else
-            no_improvements = 0  # Reset counter on improvement
-        end
-
-        new_diff = diff/ 3
+        # if best_weights == base_weights
+        #     no_improvements += 1
+        #  else
+        #     no_improvements = 0  # Reset counter on improvement
+        # end
+        new_diff = diff/ 2
         new_weights = best_weights
 
         if no_improvements >= 1 && diff < 0.2  #2 times same
@@ -266,7 +266,7 @@ begin
             no_improvements = 0
         end
 
-        return optimize_weights(new_weights, data, labels, testdata, testlabels, k, iterations -1, new_diff,no_improvements,global_best_weights, global_best_score)
+        return optimize_weights(new_weights,dataList,genreList, k, iterations -1, new_diff,no_improvements,global_best_weights, global_best_score)
     end
 
     function getDataWithrandomTest(dataList, genreList)
@@ -313,6 +313,50 @@ begin
 
     end
 
+    function splitDataWithFinalTest(dataList, genreList, final_test_percent = 20)
+        """
+        Splits data into:
+        - training_dataList: DataFrames for optimization (will be further split in each iteration)
+        - final_test_data: Fixed test set (never touched during optimization)
+        - final_test_labels: Labels for final test set
+        """
+        training_dataList = []
+        final_test_data = []
+        final_test_labels = []
+        
+        for (genreDF, genre_name) in zip(dataList, genreList)
+            DFsize = nrow(genreDF)
+            
+            # Shuffle the dataframe
+            shuffled_indices = shuffle(1:nrow(genreDF))
+            genreDF_shuffled = genreDF[shuffled_indices, :]
+            
+            # Calculate split point
+            final_test_size = DFsize * final_test_percent ÷ 100
+            training_size = DFsize - final_test_size
+            
+            # Split into training dataframe and final test
+            training_df = genreDF_shuffled[1:training_size, :]
+            final_test_df = genreDF_shuffled[(training_size+1):end, :]
+            
+            push!(training_dataList, training_df)
+            
+            # Extract final test points
+            for i in 1:nrow(final_test_df)
+                attribute1 = final_test_df.acousticness[i]
+                attribute2 = final_test_df.danceability[i]
+                attribute3 = final_test_df.energy[i]
+                
+                push!(final_test_data, [attribute1, attribute2, attribute3])
+                push!(final_test_labels, genre_name)
+            end
+        end
+        
+        return training_dataList, final_test_data, final_test_labels
+    end
+
+    
+
     function test()
         # Have to make a function that populates the data with the correct values from the
         # database. So we determined the 3 best choices: acousticness, danceability and
@@ -323,8 +367,10 @@ begin
         #nbrOfDataPointsPerGenre = 900
         #nbrOfTestsPointsPerGenre = 100
 
-        data, test_data, labels, test_labels = getDataWithrandomTest(dataList, genreList)
+        training_dataList, final_test_data, final_test_labels = splitDataWithFinalTest(dataList, genreList)
+        
 
+        data, test_data, labels, test_labels = getDataWithrandomTest(training_dataList, genreList)
 
         weights = [3,1,2]
         k = 20
@@ -333,16 +379,15 @@ begin
         point = [0.831, 0.115, 0.007]
 
 
-        acc1 = correctness(weights, data, labels, test_data, test_labels, k)
+        acc1 = correctness(weights, data, labels, final_test_data, final_test_labels, k)
         println("Correctness without weigth: " , acc1)
 
-        optimized_weights = optimize_weights([1,1,1], data, labels, test_data, test_labels, k)
+        optimized_weights = optimize_weights([1,1,1], training_dataList, genreList, k)
 
-        acc2 = correctness(optimized_weights, data, labels, test_data, test_labels, k)
+        acc2 = correctness(optimized_weights, data, labels, final_test_data, final_test_labels, k)
         println("Correctness with weigth: " , acc2)
         println("Optimized weights: ", optimized_weights)
         
-
 
         estim = k_nn(optimized_weights,data,labels,point,k)
 
