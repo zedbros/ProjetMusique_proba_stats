@@ -27,7 +27,7 @@ begin
         AND e.danceability IS NOT NULL
         AND e.energy IS NOT NULL
         AND g.title = 'Rock'
-        LIMIT 750;
+        LIMIT 790;
         """
 
     electronicQuery = """
@@ -52,7 +52,7 @@ begin
         AND e.danceability IS NOT NULL
         AND e.energy IS NOT NULL
         AND g.title = 'Electronic'
-        LIMIT 750;
+        LIMIT 790;
         """
     folkQuery = """
         SELECT 
@@ -76,7 +76,7 @@ begin
         AND e.danceability IS NOT NULL
         AND e.energy IS NOT NULL
         AND g.title = 'Folk'
-        LIMIT 750;
+        LIMIT 790;
         """
     popQuery = """
         SELECT 
@@ -100,7 +100,7 @@ begin
         AND e.danceability IS NOT NULL
         AND e.energy IS NOT NULL
         AND g.title = 'Pop'
-        LIMIT 750;
+        LIMIT 790;
         """
 
     
@@ -278,7 +278,7 @@ begin
 
         DFsize = nrow(dataList[1])
         println(DFsize)
-        nbrOfDataPointsPerGenre = DFsize * 95 ÷ 100
+        nbrOfDataPointsPerGenre = DFsize * 85 ÷ 100
         println(nbrOfDataPointsPerGenre)
         nbrOfTestsPointsPerGenre = DFsize - nbrOfDataPointsPerGenre
         println(nbrOfTestsPointsPerGenre)
