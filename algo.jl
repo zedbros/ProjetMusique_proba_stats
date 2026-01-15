@@ -1,9 +1,14 @@
 include("sql_client.jl")
 using Plots, StatsBase
 using Random
+using LinearAlgebra
+
 begin
     genreList = ["Rock", "Electronic", "Folk", "Pop"]
     queryList = []
+    print("start")
+    print("start")
+
 
     rockQuery = """
         SELECT 
@@ -205,7 +210,7 @@ begin
     end
 
 
-    function optimize_weights(base_weights,dataList,genreList, k, iterations = 5, diff = 1, no_improvements = 0,global_best_weights = nothing, global_best_score = 0)
+    function optimize_weights(base_weights,dataList,genreList, k, iterations = 5, diff = 0.5, no_improvements = 0,global_best_weights = nothing, global_best_score = 0)
         #todo : find a way to escape local optima (simulated annealing,random restarts or momentum)
 
         if iterations == 0
@@ -277,11 +282,11 @@ begin
         test_labels = []
 
         DFsize = nrow(dataList[1])
-        println(DFsize)
-        nbrOfDataPointsPerGenre = DFsize * 85 ÷ 100
-        println(nbrOfDataPointsPerGenre)
+        #println(DFsize)
+        nbrOfDataPointsPerGenre = DFsize * 80 ÷ 100
+        #println(nbrOfDataPointsPerGenre)
         nbrOfTestsPointsPerGenre = DFsize - nbrOfDataPointsPerGenre
-        println(nbrOfTestsPointsPerGenre)
+        #println(nbrOfTestsPointsPerGenre)
 
         
         for (genreDF, genre_name) in zip(dataList, genreList)
@@ -313,7 +318,7 @@ begin
 
     end
 
-    function splitDataWithFinalTest(dataList, genreList, final_test_percent = 20)
+    function splitDataWithFinalTest(dataList, genreList, final_test_percent = 15)
         """
         Splits data into:
         - training_dataList: DataFrames for optimization (will be further split in each iteration)
@@ -355,9 +360,115 @@ begin
         return training_dataList, final_test_data, final_test_labels
     end
 
+    # GRADIENT DESCENT APPROACH
+    function compute_numerical_gradient(weights, data, labels, testdata, testlabels, k, epsilon = 0.01)
+        """
+        Compute numerical gradient using finite differences
+        gradient[i] ≈ (f(w + ε*e_i) - f(w - ε*e_i)) / (2ε)
+        """
+        gradient = zeros(length(weights))
+        base_score = correctness(weights, data, labels, testdata, testlabels, k)
+        
+        for i in eachindex(weights)
+            # Perturb weight i positively
+            weights_plus = copy(weights)
+            weights_plus[i] += epsilon
+            score_plus = correctness(weights_plus, data, labels, testdata, testlabels, k)
+            
+            # Perturb weight i negatively
+            weights_minus = copy(weights)
+            weights_minus[i] = max(weights[i] - epsilon, 0)  # Keep non-negative
+            score_minus = correctness(weights_minus, data, labels, testdata, testlabels, k)
+            
+            # Central difference
+            gradient[i] = (score_plus - score_minus) / (2 * epsilon)
+        end
+        
+        return gradient
+    end
+
+    function adam_optimize(initial_weights, training_dataList, genreList, k,
+            max_iterations = 15,
+            learning_rate = 0.3,
+            beta1 = 0.9,
+            beta2 = 0.999,
+            epsilon_adam = 1e-8,
+            epsilon_grad = 0.05,
+            lambda = 0.01)
+        """
+        Optimize weights using Adam optimizer (adaptive moment estimation)
+        Generally more robust than vanilla gradient descent
+        """
+        target_weights = ones(length(initial_weights))
+        weights = copy(initial_weights)
+        m = zeros(length(weights))  # First moment estimate
+        v = zeros(length(weights))  # Second moment estimate
+        best_weights = copy(weights)
+        best_score = 0.0
+        
+        # Get initial data split
+        data, testdata, labels, testlabels = getDataWithrandomTest(training_dataList, genreList)
+        
+        println("Starting Adam Optimization")
+        println("=" ^ 50)
+        
+        for iter in 1:max_iterations
+            # Reshuffle data every 5 iterations
+           #=  if iter % 5 == 1 && iter > 1
+                data, testdata, labels, testlabels = getDataWithrandomTest(training_dataList, genreList)
+            end =#
+            
+            # Compute gradient
+            gradient = compute_numerical_gradient(weights, data, labels, testdata, testlabels, k, epsilon_grad)
+
+            #regularization_gradient = -1 * lambda * (weights - target_weights)
+            #gradient = gradient + regularization_gradient
+            
+            # Update biased first moment estimate
+            m = beta1 * m + (1 - beta1) * gradient
+            
+            # Update biased second raw moment estimate
+            v = beta2 * v + (1 - beta2) * (gradient .^ 2)
+            
+            # Compute bias-corrected moment estimates
+            m_hat = m / (1 - beta1^iter)
+            v_hat = v / (1 - beta2^iter)
+            
+            # Update weights
+            weights = weights + learning_rate * m_hat ./ (sqrt.(v_hat) .+ epsilon_adam)
+            
+            # Keep weights non-negative
+            weights = max.(weights, 0)
+            
+            # Evaluate current weights
+            current_score = correctness(weights, data, labels, testdata, testlabels, k)
+            
+            # Track best weights
+            if current_score > best_score
+                best_score = current_score
+                best_weights = copy(weights)
+                println("✓ Iter $iter: score = $(round(current_score, digits=4)), weights = $(round.(weights, digits=3))")
+            else
+                println("  Iter $iter: score = $(round(current_score, digits=4)), weights = $(round.(weights, digits=3))")
+            end
+            
+            #= # Early stopping if gradient becomes very small
+            if norm(gradient) < 0.001
+                println("Gradient too small, stopping early")
+                break
+            end =#
+        end
+        
+        println("=" ^ 50)
+        println("Best score achieved: $(round(best_score, digits=4))")
+        println("Best weights: $(round.(best_weights, digits=3))")
+        
+        return best_weights
+    end
     
 
     function test()
+        print("start")
         # Have to make a function that populates the data with the correct values from the
         # database. So we determined the 3 best choices: acousticness, danceability and
         # energy.
@@ -380,12 +491,20 @@ begin
 
 
         acc1 = correctness(weights, data, labels, final_test_data, final_test_labels, k)
-        println("Correctness without weigth: " , acc1)
+        println("Correctness with 3-1-2 weigth: " , acc1)
+
+        adam_optimised_weights = adam_optimize([1.0, 1.0, 1.0], training_dataList, genreList, k)
+
+        acc3 = correctness(adam_optimised_weights, data, labels, final_test_data, final_test_labels, k)
+        println("Correctness with adam-optimized weigth: " , acc3)
+        println("Optimized weights: ", adam_optimised_weights)
 
         optimized_weights = optimize_weights([1,1,1], training_dataList, genreList, k)
 
+
+
         acc2 = correctness(optimized_weights, data, labels, final_test_data, final_test_labels, k)
-        println("Correctness with weigth: " , acc2)
+        println("Correctness with custom-optimized weigth: " , acc2)
         println("Optimized weights: ", optimized_weights)
         
 
@@ -395,9 +514,161 @@ begin
         y = [d[2] for d in data]
         z = [d[3] for d in data]
 
-        Plots.scatter3d(x, y, z, group=labels, title = "K-nn: dist=euclidean, datasize=" * string(length(data)) * ", k=" * string(k))
-        Plots.scatter!([point[1]],[point[2]],[point[3]], label = "ESTIMATION = " * string(estim))
+        plots = []
+        for genre in genreList
+            # Filter data for this genre
+            genre_indices = findall(l -> l == genre, labels)
+            x_genre = [data[i][1] for i in genre_indices]
+            y_genre = [data[i][2] for i in genre_indices]
+            z_genre = [data[i][3] for i in genre_indices]
+            
+            # Create individual scatter plot
+            p = Plots.scatter3d(x_genre, y_genre, z_genre,
+                            title = genre,
+                            xlabel = "Acousticness",
+                            ylabel = "Danceability",
+                            zlabel = "Energy",
+                            legend = false,
+                            markersize = 3)
+            
+            push!(plots, p)
+        end
+
+        # Display all plots in a grid (2x2 for 4 genres)
+        plot(plots..., layout = (2, 2), size = (1200, 1000))
+
+       #=  Plots.scatter3d(x, y, z, group=labels, title = "",
+                xlabel = "Acousticness",
+                ylabel = "Danceability",
+                zlabel = "Energy") =#
+        #Plots.scatter3d(x, y, z, group=labels, title = "K-nn: dist=euclidean, datasize=" * string(length(data)) * ", k=" * string(k))
+        #Plots.scatter!([point[1]],[point[2]],[point[3]], label = "ESTIMATION = " * string(estim))
     end
 
-   test()
+    function create_confusion_matrix(weights, data, labels, testdata, testlabels, k, genreList)
+        """
+        Create and display a confusion matrix for the k-NN classifier
+        Returns the confusion matrix as a 2D array
+        """
+        n_classes = length(genreList)
+        confusion_mat = zeros(Int, n_classes, n_classes)
+        
+        # Create a mapping from genre name to index
+        genre_to_idx = Dict(genre => i for (i, genre) in enumerate(genreList))
+        print(length(test_data))
+        
+        # Predict each test point and update confusion matrix
+        for (testpoint, true_label) in zip(testdata, testlabels)
+            predicted_label = k_nn(weights, data, labels, testpoint, k)
+            
+            true_idx = genre_to_idx[true_label]
+            pred_idx = genre_to_idx[predicted_label]
+            
+            confusion_mat[true_idx, pred_idx] += 1
+        end
+        
+        # Display the confusion matrix
+        println("\n" * "="^60)
+        println("CONFUSION MATRIX")
+        println("="^60)
+        println("Rows = Actual, Columns = Predicted")
+        println()
+        
+        # Header
+        print("              ")
+        for genre in genreList
+            print(rpad(genre, 12))
+        end
+        println()
+        println("-"^60)
+        
+        # Matrix rows
+        for (i, genre) in enumerate(genreList)
+            print(rpad(genre, 12) * "  ")
+            for j in 1:n_classes
+                print(rpad(string(confusion_mat[i, j]), 12))
+            end
+            println()
+        end
+        println("="^60)
+        
+        # Calculate per-class metrics
+        println("\nPER-CLASS METRICS:")
+        println("-"^60)
+        
+        for (i, genre) in enumerate(genreList)
+            true_positives = confusion_mat[i, i]
+            false_positives = sum(confusion_mat[:, i]) - true_positives
+            false_negatives = sum(confusion_mat[i, :]) - true_positives
+            true_negatives = sum(confusion_mat) - true_positives - false_positives - false_negatives
+            
+            precision = true_positives / (true_positives + false_positives)
+            recall = true_positives / (true_positives + false_negatives)
+            f1_score = 2 * (precision * recall) / (precision + recall)
+            
+            println("$genre:")
+            println("  Precision: $(round(precision, digits=3))")
+            println("  Recall:    $(round(recall, digits=3))")
+            println("  F1-Score:  $(round(f1_score, digits=3))")
+            println()
+        end
+        
+        # Overall accuracy
+        total_correct = sum(confusion_mat[i, i] for i in 1:n_classes)
+        total_samples = sum(confusion_mat)
+        accuracy = total_correct / total_samples
+        
+        println("Overall Accuracy: $(round(accuracy, digits=4))")
+        println("="^60)
+        
+        return confusion_mat
+    end
+
+    function plot_confusion_matrix(confusion_mat, genreList)
+        """
+        Create a visual heatmap of the confusion matrix
+        """
+        
+        # Normalize by row (actual class) to show percentages
+        # Need to handle the division carefully to avoid NaN
+        row_sums = sum(confusion_mat, dims=2)
+        confusion_normalized = confusion_mat ./ max.(row_sums, 1)  # Avoid division by zero
+        
+        heatmap(1:length(genreList), 1:length(genreList), confusion_normalized,
+                xlabel="Predicted",
+                ylabel="Actual",
+                title="Confusion Matrix (Normalized by Row)",
+                color=:Blues,
+                clim=(0, 1),
+                aspect_ratio=:equal,
+                xticks=(1:length(genreList), genreList),
+                yticks=(1:length(genreList), genreList))
+        
+        # Add text annotations - centered in squares
+        # Show both count and percentage
+        n = length(genreList)
+        for i in 1:n
+            for j in 1:n
+                # Determine text color based on background darkness
+                text_color = confusion_normalized[i, j] > 0.5 ? :white : :black
+                count = confusion_mat[i, j]
+                percentage = round(confusion_normalized[i, j] * 100, digits=1)
+                label = "$count\n$(percentage)%"
+                annotate!(j, i, text(label, 8, text_color))
+            end
+        end
+    
+        return current()
+    end
+
+    weights =  [0.099, 0.971, 2.439]
+    test()
+    #weights = [0.65625, 0.78125, 1.171875]
+    #weights = [0.1875, 0.4375, 1.875]
+
+ #=    training_dataList, final_test_data, final_test_labels = splitDataWithFinalTest(dataList, genreList)
+    data, test_data, labels, test_labels = getDataWithrandomTest(training_dataList, genreList)
+    confusion_matrix = create_confusion_matrix(weights, data, labels, final_test_data, final_test_labels, 20, genreList)
+    plot_confusion_matrix(confusion_matrix, genreList) =#
+   #test()
 end
